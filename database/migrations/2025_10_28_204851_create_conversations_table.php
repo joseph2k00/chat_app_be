@@ -20,10 +20,10 @@ return new class extends Migration
         Schema::create('conversations', function (Blueprint $table) {
             $table->id();
             $table->string('title')->nullable();
-            $table->unsignedBigInteger('type');
+            $table->unsignedBigInteger('type_id');
             $table->timestamps();
             
-            $table->foreign('type')->references('id')->on('conversation_types')->onDelete('cascade');
+            $table->foreign('type_id')->references('id')->on('conversation_types')->onDelete('cascade');
         });
     }
 
@@ -33,5 +33,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('conversations');
+        Schema::dropIfExists('conversation_types');
     }
 };
