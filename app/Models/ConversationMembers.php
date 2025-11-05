@@ -12,4 +12,9 @@ class ConversationMembers extends Model
     {
         return $this->belongsTo(Conversation::class, 'conversation_id');
     }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
 }
