@@ -9,7 +9,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class UserSentMessageEvent implements ShouldBroadcast
+class NewMessageReceivedEvent implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -44,12 +44,12 @@ class UserSentMessageEvent implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('message.received.' . $this->conversationId),
+            new PrivateChannel('new.conversation.received.' . $this->userId),
         ];
     }
     
     public function broadcastAs()
     {
-        return 'message.received';
+        return 'new.conversation.received';
     }
 }

@@ -2,7 +2,6 @@
 
 use App\Models\ConversationMembers;
 use App\Models\User;
-use Illuminate\Container\Attributes\Log;
 use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::routes(['middleware' => ['auth:api']]);
@@ -15,4 +14,8 @@ Broadcast::channel('message.received.{conversationId}', function (User $user, in
     return ConversationMembers::where('conversation_id', $conversationId)
         ->where('user_id', $user->id)
         ->exists();
+});
+
+Broadcast::channel('new.conversation.received.{userId}', function (User $user, int $userId) {
+    return  (int) $user->id === (int) $userId;
 });

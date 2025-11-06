@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enum\ConversationType;
+use App\Events\NewMessageReceivedEvent;
 use App\Events\UserSentMessageEvent;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -69,6 +70,15 @@ class ConversationController extends Controller
         $message->save();
         // END IMPORTANT
 
+        $userId = $request->input('other_user_id');
+        NewMessageReceivedEvent::dispatch(
+            $userId,
+            $conversation->id,
+            $message->message,
+            Auth::user()->name,
+            $message->conversation->conversation_title
+        );
+
         return response()->json([
             'message' => 'Conversation created successfully',
             'conversation_id' => $conversation->id,
@@ -115,11 +125,27 @@ class ConversationController extends Controller
         $message->message = $request->input('message');
         $message->save();
 
-        UserSentMessageEvent::dispatch(
-            $message->message,
-            $message->conversation_id,
-            Auth::user()->id,
-        );
+        $otherUserIds = ConversationMembers::where('conversation_id', $request->input('conversation_id'))
+            ->where('user_id', '!=', Auth::user()->id)
+            ->pluck('user_id')
+            ->toArray();
+
+        foreach ($otherUserIds as $userId) {
+            NewMessageReceivedEvent::dispatch(
+                $userId,
+                $request->input('conversation_id'),
+                $request->input('message'),
+                Auth::user()->name,
+                $message->conversation->conversation_title
+            );
+            UserSentMessageEvent::dispatch(
+                $userId,
+                $request->input('conversation_id'),
+                $request->input('message'),
+                Auth::user()->name,
+                $message->conversation->conversation_title
+            );
+        }
 
         return response()->json(['message' => 'Message sent successfully'], 200);
     }   
