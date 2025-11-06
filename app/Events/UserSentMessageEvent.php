@@ -2,24 +2,29 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
+use App\Models\ConversationMessage;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Auth;
 
 class UserSentMessageEvent implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
+    public string $message;
+    public int $conversationId;
+
     /**
      * Create a new event instance.
      */
-    public function __construct()
-    {
+    public function __construct(
+        string $message,
+        int $conversationId
+    ) {
+        $this->message = $message;
+        $this->conversationId = $conversationId;
     }
 
     /**
@@ -30,12 +35,12 @@ class UserSentMessageEvent implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('test.ws'),
+            new PrivateChannel('message.received.' . $this->conversationId),
         ];
     }
     
     public function broadcastAs()
     {
-        return 'test.done';
+        return 'message.received';
     }
 }

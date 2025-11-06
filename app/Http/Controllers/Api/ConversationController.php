@@ -109,17 +109,18 @@ class ConversationController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $request->validate([
-            'message' => 'required|string',
-        ]);
-
         $message = new ConversationMessage();
         $message->conversation_id = $request->input('conversation_id');
         $message->sender_id = Auth::user()->id;
         $message->message = $request->input('message');
         $message->save();
 
-        
+        UserSentMessageEvent::dispatch(
+            $message->message,
+            $message->conversation_id,
+            Auth::user()->id,
+        );
+
         return response()->json(['message' => 'Message sent successfully'], 200);
     }   
 }
