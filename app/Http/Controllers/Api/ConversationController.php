@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enum\ConversationType;
+use App\Events\UserSentMessageEvent;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\ConversationMembers;
 use App\Models\Conversation;
 use App\Models\ConversationMessage;
+use App\Models\ConversationType as ModelsConversationType;
 use Illuminate\Support\Facades\Auth;
 
 class ConversationController extends Controller
@@ -46,7 +48,7 @@ class ConversationController extends Controller
 
         // Create new conversation logic
         $conversation = new Conversation();
-        $conversation->type_id = ConversationType::PRIVATE->value;
+        $conversation->type_id = ModelsConversationType::where('name', ConversationType::PRIVATE->value)->first()->id;
         $conversation->save();
 
         // IMPORTANT: PARALLEL TASK -- FUTURE IMPLEMENTATION NEEDED
@@ -117,7 +119,6 @@ class ConversationController extends Controller
         $message->message = $request->input('message');
         $message->save();
 
-        // event(new \App\Events\UserSentMessageEvent($message));
         
         return response()->json(['message' => 'Message sent successfully'], 200);
     }   

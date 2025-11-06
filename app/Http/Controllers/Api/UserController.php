@@ -13,11 +13,15 @@ class UserController extends Controller
     {
         $query = $request->input('query');
 
-        $users = User::where(function ($q) use ($query) {
-                $q->where('name', 'LIKE', "%{$query}%")
-                ->orWhere('email', 'LIKE', "%{$query}%");
-            })
-            ->where('id', '!=', Auth::user()->id);
+        // $users = User::where(function ($q) use ($query) {
+        //         $q->where('name', 'LIKE', "%{$query}%")
+        //         ->orWhere('email', 'LIKE', "%{$query}%");
+        //     })
+        //     ->where('id', '!=', Auth::user()->id);
+        $users = User::where('name', 'LIKE', "%{$query}%")
+            ->orWhere('email', 'LIKE', "%{$query}%")
+            ->limit(10)
+            ->get();
 
         return response()->json([
             'status' => 'success',

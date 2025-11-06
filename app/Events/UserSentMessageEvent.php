@@ -9,18 +9,17 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Auth;
 
-class UserSentMessageEvent
+class UserSentMessageEvent implements ShouldBroadcast
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels, ShouldBroadcast;
-
+    use Dispatchable, InteractsWithSockets, SerializesModels;
 
     /**
      * Create a new event instance.
      */
     public function __construct()
     {
-        //
     }
 
     /**
@@ -31,7 +30,12 @@ class UserSentMessageEvent
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('channel-name'),
+            new PrivateChannel('test.ws'),
         ];
+    }
+    
+    public function broadcastAs()
+    {
+        return 'test.done';
     }
 }
