@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\API\OpenAiContoller;
 use Illuminate\Support\Facades\Route;
 
 Route::post('register', [AuthController::class, 'registerWithEmail']);
@@ -18,4 +19,6 @@ Route::middleware('auth:api')->group(function () {
     Route::post('create-conversation', [ConversationController::class, 'createConversation']);
     Route::get('conversation/{conversation_id}', [ConversationController::class, 'getConversationDetails']);
     Route::post('conversation/send-message', [ConversationController::class, 'sendMessage']);
+    
+    Route::post('translate-message', [OpenAiContoller::class, 'translateMessage']);
 });
