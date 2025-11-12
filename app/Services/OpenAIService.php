@@ -17,7 +17,7 @@ class OpenAIService
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/json',
-            'Authorization: ' . 'Bearer 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',
+            'Authorization: ' . 'Bearer ' . $this->apiKey,
         ]);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
