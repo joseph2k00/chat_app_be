@@ -9,16 +9,6 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 class UserService
 {
     /**
-     * Create JWT token for a given user
-     * 
-     * @param \App\Models\User $user
-     * @return mixed
-     */
-    public function createJwtToken(User $user): mixed {
-        return JWTAuth::fromUser($user);
-    }
-
-    /**
      * Create User
      * 
      * @param array $data

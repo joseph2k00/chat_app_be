@@ -4,16 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterWithEmailRequest;
+use App\Services\AuthService;
 use App\Services\UserService;
 use Illuminate\Support\Facades\Auth;
-use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
-    protected $userService;
+    protected $userService,
+        $authService;
 
-    public function __construct(UserService $userService) {
+    public function __construct(
+        UserService $userService,
+        AuthService $authService
+    ) {
         $this->userService = $userService;
+        $this->authService = $authService;
     }
 
     /**
@@ -25,7 +30,7 @@ class AuthController extends Controller
     public function registerWithEmail(RegisterWithEmailRequest $request)
     {
         $user = $this->userService->createUser($request->all());
-        $token = $this->userService->createJwtToken($user);
+        $token = $this->authService->createJwtToken($user);
 
         return response()->json([
             'user' => $user,
@@ -41,18 +46,17 @@ class AuthController extends Controller
      */
     public function emailLogin(LoginRequest $request)
     {
-        $credentials = $request->only('email', 'password');
+        $response = $this->authService->loginUser(
+            $request->only('email', 'password')
+        );
 
-        if (!$token = JWTAuth::attempt($credentials)) {
+        if (!$response) {
             return response()->json([
                 'error' => 'Invalid credentials'
             ], 401);
         }
 
-        return response()->json([
-            'token' => $token,
-            'user' => Auth::user(),
-        ], 200);
+        return response()->json($response, 200);
     }
 
     /**
@@ -74,7 +78,7 @@ class AuthController extends Controller
      */
     public function logout()
     {    
-        Auth::logout();
+        $this->authService->logoutCurrentUser();
         
         return response()->json(
             [
