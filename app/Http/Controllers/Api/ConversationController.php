@@ -2,29 +2,42 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Enum\ConversationType;
 use App\Events\NewMessageReceivedEvent;
 use App\Events\UserSentMessageEvent;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\ConversationMembers;
-use App\Models\Conversation;
-use App\Models\ConversationMessage;
-use App\Models\ConversationType as ModelsConversationType;
+use App\Services\ConversationService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ConversationController extends Controller
 {
+    protected $conversationService;
+    
+    public function __construct(
+        ConversationService $conversationService
+    ) {
+        $this->conversationService = $conversationService;
+    }
+
+    /**
+     * Controller to get conversations of current user
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function getConversations()
     {
-        $conversations = Conversation::whereHas('members', function ($query) {
-                $query->where('user_id', Auth::user()->id);
-            })
-        ->with(['members.user', 'latestMessage'])->get();
-
+        $conversations = $this->conversationService->getConversationList();
         return response()->json($conversations, 200);
     }
 
+    /**
+     * Controller to create a new conversation between two users
+     * 
+     * @param \Illuminate\Http\Request $request
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function createConversation(Request $request)
     {
         $request->validate([
@@ -32,77 +45,66 @@ class ConversationController extends Controller
             'message' => 'required|string',
         ]);
 
-        $currentUserConversations = ConversationMembers::where('user_id', Auth::user()->id)
-            ->pluck('conversation_id')
-            ->toArray();
-
-        $existingConversation = ConversationMembers::whereIn('conversation_id', $currentUserConversations)
-            ->where('user_id', $request->input('other_user_id'))
-            ->first();
+        $existingConversation = $this->conversationService->getExistingConversationBetweenTwoUsers(
+            Auth::user()->id,
+            $request->input('other_user_id')
+        );
 
         if ($existingConversation) {
             return response()->json([
                 'message' => 'Conversation already exists',
-                'conversation_id' => $existingConversation->conversation_id,
+                'conversation_id' => $existingConversation->id,
             ], 200);
         }
 
-        // Create new conversation logic
-        $conversation = new Conversation();
-        $conversation->type_id = ModelsConversationType::where('name', ConversationType::PRIVATE->value)->first()->id;
-        $conversation->save();
-
-        // IMPORTANT: PARALLEL TASK -- FUTURE IMPLEMENTATION NEEDED
-        $member1 = new ConversationMembers();
-        $member1->conversation_id = $conversation->id;
-        $member1->user_id =Auth::user()->id;
-        $member1->save();
-
-        $member2 = new ConversationMembers();
-        $member2->conversation_id = $conversation->id;
-        $member2->user_id = $request->input('other_user_id');
-        $member2->save();
-
-        $message = new ConversationMessage();
-        $message->conversation_id = $conversation->id;
-        $message->sender_id = Auth::user()->id;
-        $message->message = $request->input('message');
-        $message->save();
-        // END IMPORTANT
-
-        $userId = $request->input('other_user_id');
+        $response = $this->conversationService->createNewConversation($request->toArray());
+        
         NewMessageReceivedEvent::dispatch(
-            $userId,
-            $conversation->id,
-            $message->message,
+            $request->input('other_user_id'),
+            $response["conversation"]["id"],
+            $response["message"]["message"],
             Auth::user()->name,
-            $message->conversation->conversation_title
+            $response["message"]["conversation"]["conversation_title"],
         );
 
         return response()->json([
             'message' => 'Conversation created successfully',
-            'conversation_id' => $conversation->id,
+            'conversation_id' => $response["conversation"]["id"],
         ], 200);
     }
 
-    public function getConversationDetails($conversation_id)
+    /**
+     * Controller to get details of a conversation
+     * 
+     * @param int $conversation_id
+     * 
+     * @return \Illuminate\Http\JsonResponse 
+     */
+    public function getConversationDetails(int $conversation_id)
     {
         // Check if the authenticated user is a member of the conversation
-        $isMember = ConversationMembers::where('conversation_id', $conversation_id)
-            ->where('user_id', Auth::user()->id)
-            ->exists();
+        $isMember = $this->conversationService->isUserMemberOfConversation(Auth::user()->id, $conversation_id);
 
         if (!$isMember) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $conversation = Conversation::with(['members.user', 'messages'])->find($conversation_id);
+        $conversation = $this->conversationService->getConversationFromId($conversation_id); 
+        
         if (!$conversation) {
             return response()->json(['message' => 'Conversation not found'], 404);
         }
+
         return response()->json($conversation, 200);
     }
 
+    /**
+     * Controller for sending a message sent by a user
+     * 
+     * @param \Illuminate\Http\Request $request
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function sendMessage(Request $request)
     {
         $request->validate([
@@ -111,19 +113,17 @@ class ConversationController extends Controller
         ]);
 
         // Check if the authenticated user is a member of the conversation
-        $isMember = ConversationMembers::where('conversation_id', $request->input('conversation_id'))
-            ->where('user_id', Auth::user()->id)
-            ->exists();
+        $isMember = $this->conversationService->isUserMemberOfConversation(Auth::user()->id, $request->input('conversation_id'));
 
         if (!$isMember) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $message = new ConversationMessage();
-        $message->conversation_id = $request->input('conversation_id');
-        $message->sender_id = Auth::user()->id;
-        $message->message = $request->input('message');
-        $message->save();
+        $message = $this->conversationService->addMessageToConversation(
+            $request->input('conversation_id'),
+            Auth::user()->id,
+            $request->input('message')
+        );
 
         $otherUserIds = ConversationMembers::where('conversation_id', $request->input('conversation_id'))
             ->where('user_id', '!=', Auth::user()->id)
