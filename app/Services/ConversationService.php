@@ -140,4 +140,12 @@ class ConversationService
             ->where('user_id', $userId)
             ->exists();
     }
+
+    public function userHasAccessToMessage(int $userId, int $msgId) {
+        $message = ConversationMessage::find($msgId);
+        return in_array(
+            $userId, 
+            $message->conversation->members->pluck('user_id')->toArray()
+        );
+    }
 }
