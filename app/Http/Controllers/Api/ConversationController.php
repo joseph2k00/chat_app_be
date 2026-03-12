@@ -2,13 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Events\NewMessageReceivedEvent;
-use App\Events\UserSentMessageEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateConversationRequest;
 use App\Http\Requests\GetConversationDetailsRequest;
 use App\Http\Requests\SendMessageRequest;
-use App\Models\ConversationMembers;
 use App\Services\ConversationService;
 use Illuminate\Support\Facades\Auth;
 
@@ -44,14 +41,6 @@ class ConversationController extends Controller
     {
         $response = $this->conversationService->createNewConversation($request->toArray());
 
-        NewMessageReceivedEvent::dispatch(
-            $request->input('other_user_id'),
-            $response["conversation"]->id,
-            $response["message"]->message,
-            Auth::user()->name,
-            $response["message"]->conversation->conversation_title,
-        );
-
         return response()->json([
             'message' => 'Conversation created successfully',
             'conversation_id' => $response["conversation"]->id,
@@ -80,34 +69,12 @@ class ConversationController extends Controller
      */
     public function sendMessage(SendMessageRequest $request)
     {
-        $message = $this->conversationService->addMessageToConversation(
+        $this->conversationService->addMessageToConversation(
             $request->input('conversation_id'),
             Auth::user()->id,
             $request->input('message')
         );
 
-        $otherUserIds = ConversationMembers::where('conversation_id', $request->input('conversation_id'))
-            ->where('user_id', '!=', Auth::user()->id)
-            ->pluck('user_id')
-            ->toArray();
-
-        foreach ($otherUserIds as $userId) {
-            NewMessageReceivedEvent::dispatch(
-                $userId,
-                $request->input('conversation_id'),
-                $request->input('message'),
-                Auth::user()->name,
-                $message->conversation->conversation_title
-            );
-            UserSentMessageEvent::dispatch(
-                $userId,
-                $request->input('conversation_id'),
-                $request->input('message'),
-                Auth::user()->name,
-                $message->conversation->conversation_title
-            );
-        }
-
         return response()->json(['message' => 'Message sent successfully'], 200);
-    }   
+    }
 }

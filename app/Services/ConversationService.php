@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Enum\ConversationType;
+use App\Events\NewMessageReceivedEvent;
+use App\Events\UserSentMessageEvent;
 use App\Models\Conversation;
 use App\Models\ConversationMembers;
 use App\Models\ConversationMessage;
@@ -48,17 +50,29 @@ class ConversationService
      */
     public function createNewConversation(array $data): array
     {
-        try {
-            DB::beginTransaction();
+        return DB::transaction(function () use ($data) {
+            $currentUserId = Auth::id();
+
             $conversation = $this->createConversation();
-            $member1 = $this->addUserToConversation($conversation->id, Auth::id());
+            $member1 = $this->addUserToConversation($conversation->id, $currentUserId);
             $member2 = $this->addUserToConversation($conversation->id, $data['other_user_id']);
             $message = $this->addMessageToConversation(
                 $conversation->id,
-                Auth::id(),
+                $currentUserId,
                 $data['message']
             );
-            DB::commit();
+
+            try {
+                $this->sendUserSentMessageNotification(
+                    $data['other_user_id'],
+                    $conversation->id,
+                    $message->message,
+                    Auth::user()->name,
+                    $message->conversation->conversation_title
+                );
+            } catch (Throwable $e) {
+                Log::error("Failed to send push notification for message ID: {$message->id}");
+            }
 
             return [
                 "conversation" => $conversation,
@@ -66,10 +80,7 @@ class ConversationService
                 "member_2" => $member2,
                 "message" => $message,
             ];
-        } catch (Throwable $e) {
-            DB::rollBack();
-            throw $e;
-        }
+        });
     }
     /**
      * Function to create new private conversation
@@ -117,11 +128,24 @@ class ConversationService
         int $userId,
         string $message
     ): ConversationMessage {
-        return ConversationMessage::create([
+        $converstionMessage = ConversationMessage::create([
             'conversation_id' => $convoId,
             'sender_id' => $userId,
             'message' => $message,
         ]);
+        
+        try {
+            $this->sendPushNotificationToConversationMembers(
+                $convoId,
+                $message,
+                Auth::user()->name,
+                $converstionMessage->conversation->conversation_title
+            );
+        } catch (Throwable $e) {
+            Log::error("Failed to send push notification for message ID: {$converstionMessage->id}");
+        }
+
+        return $converstionMessage;
     }
 
     /**
@@ -182,6 +206,97 @@ class ConversationService
         return in_array(
             $userId, 
             $message->conversation->members->pluck('user_id')->toArray()
+        );
+    }
+
+    /**
+     * Send push notification to all members of the conversation except the sender
+     * 
+     * @param int $convoId Conversation ID
+     * @param string $message Message content
+     * @param string $senderName Name of the sender
+     * @param string $conversationTitle Title of the conversation
+     */
+    public function sendPushNotificationToConversationMembers(
+        int $convoId,
+        string $message,
+        string $senderName,
+        string $conversationTitle
+    ): void {
+        $otherUserIds = ConversationMembers::where('conversation_id', $convoId)
+            ->where('user_id', '!=', Auth::user()->id)
+            ->pluck('user_id')
+            ->toArray();
+
+        foreach ($otherUserIds as $userId) {
+            $this->sendMessageReceivedNotification(
+                $userId,
+                $convoId,
+                $message,
+                $senderName,
+                $conversationTitle
+            );
+            $this->sendUserSentMessageNotification(
+                $userId,
+                $convoId,
+                $message,
+                $senderName,
+                $conversationTitle
+            );
+        }
+    }
+
+    /**
+     * Send push notification to a user when they receive a new message in a conversation
+     * 
+     * @param int $recipientUserId Recipient User ID
+     * @param int $convoId Conversation ID
+     * @param string $message Message content
+     * @param string $senderName Name of the sender
+     * @param string $conversationTitle Title of the conversation
+     * 
+     * @return void
+     */
+    public function sendMessageReceivedNotification(
+        int $recipientUserId,
+        int $convoId,
+        string $message,
+        string $senderName,
+        string $conversationTitle
+    ): void {
+        NewMessageReceivedEvent::dispatch(
+            $recipientUserId,
+            $convoId,
+            $message,
+            $senderName,
+            $conversationTitle
+        );
+    }   
+
+    /**
+     * Send push notification to a user when they send a new message in a conversation
+     *  
+     * @param int $recipientUserId Recipient User ID
+     * @param int $convoId Conversation ID
+     * @param string $message Message content
+     * @param string $senderName Name of the sender
+     * @param string $conversationTitle Title of the conversation
+     * 
+     * @return void
+     */
+    public function sendUserSentMessageNotification(
+        int $recipientUserId,
+        int $convoId,
+        string $message,
+        string $senderName,
+        string $conversationTitle
+    ): void {
+        UserSentMessageEvent::dispatch(
+            $recipientUserId,
+            $convoId,
+            $message,
+            $senderName,
+            $conversationTitle
         );
     }
 }
