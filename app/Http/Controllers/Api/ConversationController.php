@@ -6,9 +6,10 @@ use App\Events\NewMessageReceivedEvent;
 use App\Events\UserSentMessageEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateConversationRequest;
+use App\Http\Requests\GetConversationDetailsRequest;
+use App\Http\Requests\SendMessageRequest;
 use App\Models\ConversationMembers;
 use App\Services\ConversationService;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ConversationController extends Controller
@@ -41,19 +42,6 @@ class ConversationController extends Controller
      */
     public function createConversation(CreateConversationRequest $request)
     {
-
-        $existingConversation = $this->conversationService->getExistingConversationBetweenTwoUsers(
-            Auth::user()->id,
-            $request->input('other_user_id')
-        );
-
-        if ($existingConversation) {
-            return response()->json([
-                'message' => 'Conversation already exists',
-                'conversation_id' => $existingConversation->id,
-            ], 200);
-        }
-
         $response = $this->conversationService->createNewConversation($request->toArray());
 
         NewMessageReceivedEvent::dispatch(
@@ -77,21 +65,9 @@ class ConversationController extends Controller
      * 
      * @return \Illuminate\Http\JsonResponse 
      */
-    public function getConversationDetails(int $conversation_id)
+    public function getConversationDetails(GetConversationDetailsRequest $request)
     {
-        // Check if the authenticated user is a member of the conversation
-        $isMember = $this->conversationService->isUserMemberOfConversation(Auth::user()->id, $conversation_id);
-
-        if (!$isMember) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $conversation = $this->conversationService->getConversationFromId($conversation_id); 
-        
-        if (!$conversation) {
-            return response()->json(['message' => 'Conversation not found'], 404);
-        }
-
+        $conversation = $this->conversationService->getConversationFromId($request->conversation_id); 
         return response()->json($conversation, 200);
     }
 
@@ -102,20 +78,8 @@ class ConversationController extends Controller
      * 
      * @return \Illuminate\Http\JsonResponse
      */
-    public function sendMessage(Request $request)
+    public function sendMessage(SendMessageRequest $request)
     {
-        $request->validate([
-            'message' => 'required|string',
-            'conversation_id' => 'required|exists:conversations,id',
-        ]);
-
-        // Check if the authenticated user is a member of the conversation
-        $isMember = $this->conversationService->isUserMemberOfConversation(Auth::user()->id, $request->input('conversation_id'));
-
-        if (!$isMember) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $message = $this->conversationService->addMessageToConversation(
             $request->input('conversation_id'),
             Auth::user()->id,

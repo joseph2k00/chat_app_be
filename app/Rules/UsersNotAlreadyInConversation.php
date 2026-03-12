@@ -37,7 +37,7 @@ class UsersNotAlreadyInConversation implements ValidationRule
             (int) $value
         );
         
-        if (!$existingConversation) {
+        if (isset($existingConversation)) {
             $fail('A conversation between this user already exists.');
         }
     }
