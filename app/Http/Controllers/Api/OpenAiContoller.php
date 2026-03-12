@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\Auth;
 
 class OpenAiContoller extends Controller
 {
-    protected $openAIService,
-        $conversationService;
+    protected OpenAIService $openAIService;
+    protected ConversationService $conversationService;
 
     public function __construct(
         OpenAIService $openAIService,
@@ -21,6 +21,12 @@ class OpenAiContoller extends Controller
         $this->conversationService = $conversationService;
     }
 
+    /**
+     * Controller to translate a given message
+     * 
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function translateMessage(Request $request)
     {
         $request->validate([

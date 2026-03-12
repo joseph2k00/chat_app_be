@@ -14,7 +14,14 @@ class OpenAIService
         $this->apiKey = env('OPENAI_API_KEY');
     }
 
-    public function sendRequest($data)
+    /**
+     * Send request to OpenAI API
+     * 
+     * @param mixed $data
+     * 
+     * @return array
+     */
+    public function sendRequest($data): array
     {
         $ch = curl_init(self::API_URL);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -36,6 +43,14 @@ class OpenAIService
         return json_decode($response, true);
     }
 
+    /**
+     * Translate given message to target language
+     * 
+     * @param int $messageId
+     * @param string $targetLanguage
+     * 
+     * @return \Illuminate\Http\JsonResponse|array
+     */
     public function translateMessage(int $messageId, string $targetLanguage) {
         $message = ConversationMessage::find($messageId)->message;
 
