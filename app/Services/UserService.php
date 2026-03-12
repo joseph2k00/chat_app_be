@@ -3,8 +3,9 @@
 namespace App\Services;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Tymon\JWTAuth\Facades\JWTAuth;
 
 class UserService
 {
@@ -36,16 +37,15 @@ class UserService
      * Get users list from search query
      * 
      * @param string $query
-     * @return \App\Models\User
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getUsersList(string $query): User {
-        // $users = User::where(function ($q) use ($query) {
-        //         $q->where('name', 'LIKE', "%{$query}%")
-        //         ->orWhere('email', 'LIKE', "%{$query}%");
-        //     })
-        //     ->where('id', '!=', Auth::user()->id);
-        return User::where('name', 'LIKE', "%{$query}%")
-            ->orWhere('email', 'LIKE', "%{$query}%")
+    public function getUsersList(string $query): Collection
+    {
+        return User::where(function ($q) use ($query) {
+                $q->where('name', 'LIKE', "%{$query}%")
+                ->orWhere('email', 'LIKE', "%{$query}%");
+            })
+            ->where('id', '!=', Auth::id())
             ->limit(10)
             ->get();
     }
