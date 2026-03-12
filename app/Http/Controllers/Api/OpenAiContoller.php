@@ -3,10 +3,9 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TranslateMessageRequest;
 use App\Services\ConversationService;
 use App\Services\OpenAIService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class OpenAiContoller extends Controller
 {
@@ -27,20 +26,8 @@ class OpenAiContoller extends Controller
      * @param \Illuminate\Http\Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function translateMessage(Request $request)
+    public function translateMessage(TranslateMessageRequest $request)
     {
-        $request->validate([
-            'message_id' => 'required|exists:conversation_messages,id',
-            'target_language' => 'required|string',
-        ]);
-
-        if (!$this->conversationService->userHasAccessToMessage(Auth::id(), $request->input('message_id'))) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Permission Denied',
-            ], 403);
-        }
-        
         $response = $this->openAIService->translateMessage(
             $request->input('message_id'), 
             $request->input('target_language')
