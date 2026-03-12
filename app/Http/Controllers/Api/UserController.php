@@ -4,33 +4,32 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\User;
-use Illuminate\Support\Facades\Auth;
+use App\Services\UserService;
 
 class UserController extends Controller
 {
+    protected $userService;
+
+    public function __construct(UserService $userService)
+    {
+        $this->userService = $userService;
+    }
+
+    /**
+     * Search users by email or name
+     * 
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function searchUsers(Request $request)
     {
-        $query = $request->input('query');
-
-        // $users = User::where(function ($q) use ($query) {
-        //         $q->where('name', 'LIKE', "%{$query}%")
-        //         ->orWhere('email', 'LIKE', "%{$query}%");
-        //     })
-        //     ->where('id', '!=', Auth::user()->id);
-        $users = User::where('name', 'LIKE', "%{$query}%")
-            ->orWhere('email', 'LIKE', "%{$query}%")
-            ->limit(10)
-            ->get();
+        $users = $this->userService->getUsersList(
+            $request->input('query')
+        );
 
         return response()->json([
             'status' => 'success',
             'data' => $users
         ]);
-    }
-
-    public function checkUserConnection(Request $request, $user_id)
-    {
-        
     }
 }

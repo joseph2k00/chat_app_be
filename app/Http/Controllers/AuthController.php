@@ -4,27 +4,33 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterWithEmailRequest;
-use App\Models\User;
-use Illuminate\Http\Request;
+use App\Services\AuthService;
+use App\Services\UserService;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Tymon\JWTAuth\Facades\JWTAuth;
-use Tymon\JWTAuth\Exceptions\JWTException;
 
 class AuthController extends Controller
 {
+    protected $userService,
+        $authService;
+
+    public function __construct(
+        UserService $userService,
+        AuthService $authService
+    ) {
+        $this->userService = $userService;
+        $this->authService = $authService;
+    }
+
     /**
-     * Register with Email
+     * Register new user with Email
+     * 
+     * @param \App\Http\Requests\RegisterWithEmailRequest $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function registerWithEmail(RegisterWithEmailRequest $request)
     {
-        $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        $token = JWTAuth::fromUser($user);
+        $user = $this->userService->createUser($request->all());
+        $token = $this->authService->createJwtToken($user);
 
         return response()->json([
             'user' => $user,
@@ -32,37 +38,52 @@ class AuthController extends Controller
         ], 200);
     }
 
-    // Login
+    /**
+     * Login user with email
+     * 
+     * @param \App\Http\Requests\LoginRequest $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function emailLogin(LoginRequest $request)
     {
-        $credentials = $request->only('email', 'password');
+        $response = $this->authService->loginUser(
+            $request->only('email', 'password')
+        );
 
-        try {
-            if (! $token = JWTAuth::attempt($credentials)) {
-                return response()->json([
-                    'error' => 'Invalid credentials'
-                ], 401);
-            }
-        } catch (Exception $e) {
+        if (!$response) {
             return response()->json([
-                'error' => 'Something went wrong'
-            ], 500);
+                'error' => 'Invalid credentials'
+            ], 401);
         }
 
-        return response()->json([
-            'token' => $token,
-            'user' => Auth::user(),
-        ], 200);
+        return response()->json($response, 200);
     }
 
+    /**
+     * Get user Profile
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function profile()
     {
-        return response()->json(Auth::user());
+        return response()->json(
+            $this->userService->getUserProfile(Auth::user()->id)
+        );
     }
 
+    /**
+     * Logout user
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function logout()
-    {
-        Auth::logout();
-        return response()->json(['message' => 'Successfully logged out']);
+    {    
+        $this->authService->logoutCurrentUser();
+        
+        return response()->json(
+            [
+                'message' => 'Successfully logged out'
+            ]
+        );
     }
 }
