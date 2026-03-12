@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Events\NewMessageReceivedEvent;
 use App\Events\UserSentMessageEvent;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CreateConversationRequest;
 use App\Models\ConversationMembers;
 use App\Services\ConversationService;
 use Illuminate\Http\Request;
@@ -38,12 +39,8 @@ class ConversationController extends Controller
      * 
      * @return \Illuminate\Http\JsonResponse
      */
-    public function createConversation(Request $request)
+    public function createConversation(CreateConversationRequest $request)
     {
-        $request->validate([
-            'other_user_id' => 'required|exists:users,id',
-            'message' => 'required|string',
-        ]);
 
         $existingConversation = $this->conversationService->getExistingConversationBetweenTwoUsers(
             Auth::user()->id,
