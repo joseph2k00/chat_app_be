@@ -7,20 +7,25 @@ use App\Models\Conversation;
 use App\Models\ConversationMembers;
 use App\Models\ConversationMessage;
 use App\Models\ConversationType as ModelsConversationType;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ConversationService
 {
     /**
      * Function to get list of conversations of the authenticated user
      * 
-     * @return \App\Models\Conversation
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getConversationList(): Conversation {
+    public function getConversationList(): Collection {
         return Conversation::whereHas('members', function ($query) {
                 $query->where('user_id', Auth::user()->id);
             })
-        ->with(['members.user', 'latestMessage'])->get();
+        ->with(['members.user', 'latestMessage'])
+        ->get();
     }
 
     /**
@@ -41,22 +46,31 @@ class ConversationService
      * 
      * @return array Associative array
      */
-    public function createNewConversation(array $data): array {
-        $conversation = $this->createConversation();
+    public function createNewConversation(array $data): array
+    {
+        try {
+            DB::beginTransaction();
+            $conversation = $this->createConversation();
+            $member1 = $this->addUserToConversation($conversation->id, Auth::id());
+            $member2 = $this->addUserToConversation($conversation->id, $data['other_user_id']);
+            $message = $this->addMessageToConversation(
+                $conversation->id,
+                Auth::id(),
+                $data['message']
+            );
+            DB::commit();
 
-        $member1 = $this->addUserToConversation($conversation->id, Auth::user()->id);
-        $member2 = $this->addUserToConversation($conversation->id, $data['other_user_id']);
-        
-        $message = $this->addMessageToConversation($conversation->id, Auth::user()->id, $data['message']);
-
-        return [
-            "conversation" => $conversation->toArray(),
-            "member_1" => $member1->toArray(),
-            "member_2" => $member2->toArray(),
-            "message" => $message->toArray(),
-        ];
+            return [
+                "conversation" => $conversation,
+                "member_1" => $member1,
+                "member_2" => $member2,
+                "message" => $message,
+            ];
+        } catch (Throwable $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
-
     /**
      * Function to create new private conversation
      * 
@@ -78,7 +92,10 @@ class ConversationService
      * 
      * @return \App\Models\ConversationMembers
      */
-    public function addUserToConversation(int $convoId, int $userId): ConversationMembers {
+    public function addUserToConversation(
+        int $convoId,
+        int $userId
+    ): ConversationMembers {
         $member = new ConversationMembers();
         $member->conversation_id = $convoId;
         $member->user_id = $userId;
@@ -95,14 +112,16 @@ class ConversationService
      * 
      * @return \App\Models\ConversationMessage
      */
-    public function addMessageToConversation(int $convoId, int $userId, string $message): ConversationMessage {
-        $message = new ConversationMessage();
-        $message->conversation_id = $convoId;
-        $message->sender_id = $userId;
-        $message->message = $message;
-        $message->save();
-
-        return $message;
+    public function addMessageToConversation(
+        int $convoId,
+        int $userId,
+        string $message
+    ): ConversationMessage {
+        return ConversationMessage::create([
+            'conversation_id' => $convoId,
+            'sender_id' => $userId,
+            'message' => $message,
+        ]);
     }
 
     /**
@@ -113,7 +132,10 @@ class ConversationService
      * 
      * @return \App\Models\Conversation|null
      */
-    public function getExistingConversationBetweenTwoUsers(int $userId, int $otherUserId): Conversation|null {
+    public function getExistingConversationBetweenTwoUsers(
+        int $userId,
+        int $otherUserId
+    ): Conversation|null {
         $currentUserConversations = ConversationMembers::where('user_id', $userId)
             ->pluck('conversation_id')
             ->toArray();
@@ -135,13 +157,27 @@ class ConversationService
      * 
      * @return bool
      */
-    public function isUserMemberOfConversation(int $userId, int $convoId): bool {
+    public function isUserMemberOfConversation(
+        int $userId,
+        int $convoId
+    ): bool {
         return ConversationMembers::where('conversation_id', $convoId)
             ->where('user_id', $userId)
             ->exists();
     }
 
-    public function userHasAccessToMessage(int $userId, int $msgId) {
+    /**
+     * Check if user has access
+     * 
+     * @param int $userId
+     * @param int $msgId
+     * 
+     * @return bool
+     */
+    public function userHasAccessToMessage(
+        int $userId,
+        int $msgId
+    ): bool {
         $message = ConversationMessage::find($msgId);
         return in_array(
             $userId, 

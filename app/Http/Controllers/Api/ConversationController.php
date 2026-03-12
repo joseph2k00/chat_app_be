@@ -58,18 +58,18 @@ class ConversationController extends Controller
         }
 
         $response = $this->conversationService->createNewConversation($request->toArray());
-        
+
         NewMessageReceivedEvent::dispatch(
             $request->input('other_user_id'),
-            $response["conversation"]["id"],
-            $response["message"]["message"],
+            $response["conversation"]->id,
+            $response["message"]->message,
             Auth::user()->name,
-            $response["message"]["conversation"]["conversation_title"],
+            $response["message"]->conversation->conversation_title,
         );
 
         return response()->json([
             'message' => 'Conversation created successfully',
-            'conversation_id' => $response["conversation"]["id"],
+            'conversation_id' => $response["conversation"]->id,
         ], 200);
     }
 
